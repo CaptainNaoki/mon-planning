@@ -33,6 +33,51 @@ button{font-family:inherit;cursor:pointer}input{font-family:inherit}
 #update-banner button{font-size:11px;font-weight:700;padding:7px 16px;border-radius:20px;border:none}
 .ubtn-ok{background:#EF9F27;color:#1c1c1a}
 .ubtn-later{background:rgba(255,255,255,.15);color:#f0ede8}
+
+/* ── Countdown top banner ── */
+#cntdwn-banner{
+  display:none;position:fixed;top:0;left:0;right:0;z-index:998;
+  padding-top:calc(env(safe-area-inset-top) + 8px);
+  padding-bottom:10px;padding-left:16px;padding-right:16px;
+  background:rgba(28,28,26,0.96);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
+  box-shadow:0 3px 20px rgba(0,0,0,.35);
+  flex-direction:row;align-items:center;gap:12px;
+  border-bottom:2px solid #EF9F27;
+}
+#cntdwn-banner.show{display:flex}
+#cntdwn-banner.urgent{border-bottom-color:#E24B4A;animation:urgentPulse 0.8s infinite alternate;}
+@keyframes urgentPulse{from{background:rgba(28,28,26,0.96)}to{background:rgba(60,15,15,0.98)}}
+#cntdwn-icon{font-size:20px;flex-shrink:0}
+#cntdwn-info{flex:1;min-width:0}
+#cntdwn-task{font-size:11px;font-weight:700;color:rgba(240,237,232,.55);letter-spacing:.3px;text-transform:uppercase;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#cntdwn-time{font-size:26px;font-weight:800;font-variant-numeric:tabular-nums;letter-spacing:-.5px;color:#EF9F27;line-height:1}
+#cntdwn-banner.urgent #cntdwn-time{color:#E24B4A}
+#cntdwn-bar-wrap{width:100%;height:3px;background:rgba(255,255,255,.12);border-radius:2px;overflow:hidden;margin-top:4px}
+#cntdwn-bar{height:100%;border-radius:2px;background:#EF9F27;transition:width .9s linear}
+#cntdwn-banner.urgent #cntdwn-bar{background:#E24B4A}
+#cntdwn-stop{font-size:11px;font-weight:700;padding:7px 12px;border-radius:20px;border:1px solid rgba(255,255,255,.2);background:transparent;color:#f0ede8;flex-shrink:0;cursor:pointer}
+
+/* ── Alarm overlay ── */
+#alarm-overlay{
+  display:none;position:fixed;inset:0;z-index:9999;
+  background:rgba(10,5,5,0.92);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+  flex-direction:column;align-items:center;justify-content:center;gap:20px;
+  padding:40px 30px;
+}
+#alarm-overlay.show{display:flex;animation:alarmIn .3s cubic-bezier(.34,1.56,.64,1)}
+@keyframes alarmIn{from{opacity:0;transform:scale(.9)}to{opacity:1;transform:scale(1)}}
+#alarm-ring{font-size:72px;animation:ringShake .4s infinite alternate}
+@keyframes ringShake{from{transform:rotate(-12deg) scale(1)}to{transform:rotate(12deg) scale(1.08)}}
+#alarm-task-name{font-size:14px;font-weight:700;color:rgba(240,237,232,.55);letter-spacing:.8px;text-transform:uppercase;text-align:center}
+#alarm-msg{font-size:28px;font-weight:800;color:#f0ede8;text-align:center;line-height:1.2;letter-spacing:-.4px}
+#alarm-sub{font-size:14px;color:rgba(240,237,232,.45);text-align:center}
+#alarm-dismiss{
+  font-size:15px;font-weight:800;padding:16px 48px;border-radius:30px;
+  border:none;background:#EF9F27;color:#1c1c1a;cursor:pointer;margin-top:10px;
+  box-shadow:0 0 30px rgba(239,159,39,.5);
+  animation:dismissPulse 1.2s infinite;
+}
+@keyframes dismissPulse{0%,100%{box-shadow:0 0 20px rgba(239,159,39,.4)}50%{box-shadow:0 0 40px rgba(239,159,39,.8)}}
 .hdr{background:#1c1c1a;color:#f0ede8;padding:14px 14px 0;position:sticky;top:0;z-index:100;box-shadow:0 2px 8px rgba(0,0,0,.15)}
 .hdr h1{font-size:16px;font-weight:700;letter-spacing:-.3px}
 .hdr-sub{font-size:10px;color:rgba(240,237,232,.45);margin-top:1px;margin-bottom:10px}
@@ -119,6 +164,26 @@ canvas{display:block;width:100%}
 </style>
 </head>
 <body>
+<!-- Countdown top banner -->
+<div id="cntdwn-banner">
+  <div id="cntdwn-icon">⏱</div>
+  <div id="cntdwn-info">
+    <div id="cntdwn-task">En cours</div>
+    <div id="cntdwn-time">00:00</div>
+    <div id="cntdwn-bar-wrap"><div id="cntdwn-bar" style="width:100%"></div></div>
+  </div>
+  <button id="cntdwn-stop" onclick="stopActiveBannerTimer()">⏹ Stop</button>
+</div>
+
+<!-- Alarm overlay -->
+<div id="alarm-overlay">
+  <div id="alarm-ring">🔔</div>
+  <div id="alarm-task-name" id="alarm-task-name"></div>
+  <div id="alarm-msg">Temps écoulé !</div>
+  <div id="alarm-sub">Ta session est terminée</div>
+  <button id="alarm-dismiss" onclick="dismissAlarm()">OK, j'ai compris !</button>
+</div>
+
 <!-- Update banner -->
 <div id="update-banner">
   <p>🔄 Une nouvelle version est disponible !</p>
@@ -239,18 +304,115 @@ function trec(di,tid){const d=dd(di);if(!d[tid])d[tid]={};return d[tid];}
 function crec(di,tid,ch){const t=trec(di,tid);if(!t.choices)t.choices={};if(!t.choices[ch])t.choices[ch]={};return t.choices[ch];}
 function getCh(tid){const def=taskDefs(0).find(t=>t.id===tid);return[...(def&&def.defCh||[]),...(custom[tid]||[])];}
 
-function beep(){
+// ── Audio & Alarm ─────────────────────────────────────────────────────────
+let audioCtx = null;
+let alarmInterval = null;
+let activeBannerKey = null; // tkey of currently shown timer in banner
+let activeBannerDur = 0;
+let activeBannerTid = null;
+let activeBannerCh = null;
+let activeBannerDi = null;
+
+function getAudioCtx(){
+  if(!audioCtx||audioCtx.state==='closed'){
+    audioCtx=new(window.AudioContext||window.webkitAudioContext)();
+  }
+  if(audioCtx.state==='suspended') audioCtx.resume();
+  return audioCtx;
+}
+
+function playAlarmTone(){
   try{
-    const ctx=new(window.AudioContext||window.webkitAudioContext)();
-    for(let i=0;i<3;i++){
+    const ctx=getAudioCtx();
+    // Alternating high-low alarm pattern
+    const pattern=[
+      [1046,0,0.18],[1318,0.2,0.18],[1046,0.4,0.18],[1318,0.6,0.18],
+      [880, 0.9,0.35]
+    ];
+    pattern.forEach(([freq,delay,len])=>{
       const o=ctx.createOscillator(),g=ctx.createGain();
       o.connect(g);g.connect(ctx.destination);
-      o.frequency.value=880;o.type='sine';
-      const t0=ctx.currentTime+i*0.45;
-      g.gain.setValueAtTime(0.4,t0);g.gain.exponentialRampToValueAtTime(0.01,t0+0.38);
-      o.start(t0);o.stop(t0+0.38);
-    }
+      o.frequency.value=freq;o.type='square';
+      const t0=ctx.currentTime+delay;
+      g.gain.setValueAtTime(0,t0);
+      g.gain.linearRampToValueAtTime(0.4,t0+0.02);
+      g.gain.setValueAtTime(0.4,t0+len-0.04);
+      g.gain.linearRampToValueAtTime(0,t0+len);
+      o.start(t0);o.stop(t0+len+0.05);
+    });
   }catch(e){}
+}
+
+function startAlarm(taskLabel){
+  // Show overlay
+  const overlay=document.getElementById('alarm-overlay');
+  document.getElementById('alarm-task-name').textContent=taskLabel.toUpperCase();
+  overlay.classList.add('show');
+  // Loop alarm sound every 1.5s
+  playAlarmTone();
+  if(alarmInterval)clearInterval(alarmInterval);
+  alarmInterval=setInterval(playAlarmTone,1500);
+  // Try vibration (Android/some browsers — ignored on iOS silently)
+  if(navigator.vibrate) navigator.vibrate([400,200,400,200,800]);
+}
+
+function dismissAlarm(){
+  document.getElementById('alarm-overlay').classList.remove('show');
+  if(alarmInterval){clearInterval(alarmInterval);alarmInterval=null;}
+  if(navigator.vibrate) navigator.vibrate(0);
+}
+
+// ── Countdown banner ─────────────────────────────────────────────────────
+function showBanner(tid,ch,dur,taskLabel){
+  activeBannerKey=tkey(tid,ch);
+  activeBannerDur=dur;
+  activeBannerTid=tid;
+  activeBannerCh=ch;
+  document.getElementById('cntdwn-task').textContent=taskLabel;
+  document.getElementById('cntdwn-icon').textContent='⏱';
+  document.getElementById('cntdwn-banner').classList.add('show');
+  // Offset body so content isn't hidden under banner
+  updateBodyOffset(true);
+}
+
+function hideBanner(){
+  activeBannerKey=null;
+  document.getElementById('cntdwn-banner').classList.remove('show');
+  document.getElementById('cntdwn-banner').classList.remove('urgent');
+  updateBodyOffset(false);
+}
+
+function updateBodyOffset(hasBanner){
+  // Measure actual banner height and offset the sticky header
+  if(hasBanner){
+    const b=document.getElementById('cntdwn-banner');
+    document.body.style.paddingTop=(b.offsetHeight||80)+'px';
+  }else{
+    document.body.style.paddingTop='';
+  }
+}
+
+function updateBanner(elapsed,dur){
+  const remain=Math.max(0,dur-elapsed);
+  const pct=Math.min(100,(elapsed/dur)*100);
+  const urgent=remain<120; // last 2 min
+  const banner=document.getElementById('cntdwn-banner');
+  document.getElementById('cntdwn-time').textContent=fmt(remain);
+  document.getElementById('cntdwn-bar').style.width=(100-pct).toFixed(1)+'%';
+  if(urgent) banner.classList.add('urgent');
+  else banner.classList.remove('urgent');
+}
+
+function stopActiveBannerTimer(){
+  if(activeBannerTid!==null){
+    stopTimer(activeBannerDi||selDay,activeBannerTid,activeBannerCh,false);
+  }
+}
+
+function getTaskLabel(tid,ch){
+  const def=taskDefs(0).find(t=>t.id===tid);
+  const base=def?def.lbl:tid;
+  return ch?`${base} – ${ch}`:base;
 }
 
 function tkey(tid,ch){return ch?`${tid}:${ch}`:tid;}
@@ -263,14 +425,26 @@ function fmtHM(ts){if(!ts)return'–';const d=new Date(ts);return d.toLocaleTime
 
 function startTimer(di,tid,ch,dur){
   const k=tkey(tid,ch);if(ivs[k])return;
+  // Unlock AudioContext on user gesture
+  try{getAudioCtx();}catch(e){}
   const rec=ch?crec(di,tid,ch):trec(di,tid);
   const now=Date.now(),base=rec.elapsed||0;
   rec.timerRunning=true;if(!rec.startTime)rec.startTime=new Date(now).toISOString();
-  rec.lastStart=now;tick[k]={lastStart:now,base};save();
+  rec.lastStart=now;tick[k]={lastStart:now,base};
+  activeBannerDi=di;
+  save();
+  // Show top banner
+  showBanner(tid,ch,dur,getTaskLabel(tid,ch));
   ivs[k]=setInterval(()=>{
     const el=tick[k].base+(Date.now()-tick[k].lastStart)/1000;
     const r2=ch?crec(di,tid,ch):trec(di,tid);r2.elapsed=el;
-    if(el>=dur){stopTimer(di,tid,ch,true);beep();return;}
+    // Update banner if this is the active timer
+    if(activeBannerKey===k) updateBanner(el,dur);
+    if(el>=dur){
+      stopTimer(di,tid,ch,true);
+      startAlarm(getTaskLabel(tid,ch));
+      return;
+    }
     inlineUpdateTimer(tid,ch,el,dur,C[r2.col||'blue'].mid||'#888');
   },1000);
   render();
@@ -288,6 +462,17 @@ function stopTimer(di,tid,ch,auto_){
     const rec=trec(di,tid);
     if(rec.lastStart)rec.elapsed=(rec.elapsed||0)+(Date.now()-rec.lastStart)/1000;
     rec.timerRunning=false;rec.done=true;if(!rec.endTime)rec.endTime=new Date().toISOString();
+  }
+  // Hide banner if no other timer is running
+  if(activeBannerKey===k){
+    // Check if another timer is running
+    const otherKey=Object.keys(ivs)[0];
+    if(otherKey){
+      // Switch banner to next running timer (find its info)
+      activeBannerKey=otherKey;
+    }else{
+      hideBanner();
+    }
   }
   save();render();
 }
@@ -670,6 +855,7 @@ function resetTask(tid,e){
   if(ivs[k]){clearInterval(ivs[k]);delete ivs[k];delete tick[k];}
   const choices=getCh(tid);
   choices.forEach(ch=>{const ck=tkey(tid,ch);if(ivs[ck]){clearInterval(ivs[ck]);delete ivs[ck];delete tick[ck];}});
+  if(activeBannerTid===tid) hideBanner();
   if(!data[selDay])data[selDay]={};
   data[selDay][tid]={};
   expanded[tid]=null;
